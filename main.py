@@ -1,37 +1,74 @@
 #!/bin/python
+import subprocess
+import datetime
 import requests
 import zipfile
+import asyncio
 import sys
 import os
 
 
-def load(to_file, file):
-    print(f"Downloading: {file}")
-    URL = requests.get(f"https://raw.githubusercontent.com/Tikhon-code/package-manager/refs/heads/main/repository/{to_file}{file}", stream=True)
-    if URL.status_code == 200:
-        with open(f"files/{file}", 'wb') as f:
-            f.write(URL.content)
-
+def start(startind=0):
+    global now
+    if startind == 0:
+        now = datetime.datetime.now()
     else:
-        print(f"File: {file} not found in {to_file}")
-        return 1
+        now = startind
 
-    
+def end():
+    end = datetime.datetime.now()
+    return end - now
 
-def load_packages(for_file, file):
+
+def show_packages(for_file, file):
+    print("To install:")
     with open(f"{for_file}{file}", 'r') as f:
         for line in f:
-            load('packages/', line.strip())
-            if line.strip().endswith('zip'):
-                with zipfile.ZipFile(f"{for_file}{line}".strip(), 'r') as zip:
-                    zip.extractall(for_file)
-                os.remove(f"{for_file}{line}".strip())
-
+            line = line.strip()
+            print(line)
     
+    '''
+    yesorno = input("Download? Y/n: ")
+    if yesorno.lower() == "y" or yesorno.strip() == "":
+       pass
+    else:
+        os.remove(f"{for_file}{file}")
+        sys.exit(0)
+    '''
+
+def load(to_file, file, sub=False):
+    global process
+    if sub == False:
+        os.system(f'luajit request.lua {to_file} {file}')
+    else:
+        process = subprocess.Popen(['luajit', 'request.lua', to_file, file])
+
+
+async def load_packages(for_file, file):
+    show_packages(for_file, file)
+    with open(f"{for_file}{file}", 'r') as f:
+        for line in f:
+            line = line.strip()
+            load('packages/', file=line, sub=True)
+            if line.endswith('zip'):
+                process.wait()
+                print(f"extracting: {line}")
+                
+                with zipfile.ZipFile(f"{for_file}{line}", 'r') as zip:
+                    zip.extractall(for_file)
+                
+
+                print(f"deleting source zip file: {line}")
+                os.remove(f"{for_file}{line}")
+
+
 def main(file):
-    if load('info/', f"{file}.info") != 1:
-        load_packages('files/', f"{file}.info")
-        os.remove(f'files/{file}.info')
+    start()
+    load('info/', f"{file}.info", False)
+    asyncio.run(load_packages('files/', f"{file}.info"))
+    os.remove(f'files/{file}.info')
+    print(f"Downloading complete, finish time: {end()}")
+
 
 if len(sys.argv[1:]) >= 1:
     main(sys.argv[1])
