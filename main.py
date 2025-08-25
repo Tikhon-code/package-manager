@@ -1,5 +1,6 @@
 #!/bin/python
 
+from multiprocessing import Process
 import datetime
 import asyncio
 import aiohttp
@@ -22,7 +23,9 @@ def end():
     return end - now
 
 
-async def load(for_file, file):
+async def load(for_file, file, type=None):
+    if type != None:
+        file = f"{file}.{type}"
     async with aiohttp.ClientSession() as session:
         async with session.get(f"https://raw.githubusercontent.com/Tikhon-code/package-manager/refs/heads/main/repository/{for_file}{file}") as response:
             if response.status == 200:
@@ -39,14 +42,16 @@ async def load(for_file, file):
                 async with aiofiles.open(f"downloads/{file}", 'wb') as f:
                     await f.write(body)
                     return to_unzip.append(f"downloads/{file}")
+                    
             else:
                 async with aiofiles.open(f"downloads/{file}", 'w') as f:
                     await f.write(body)
                     
 
-async def load_packages(file):
+async def load_packages(file, type, *args):
+    file2 = f"{file}.{type}"
     files = []
-    with open(f'downloads/{file}', 'r') as f:
+    with open(f'downloads/{file2}', 'r') as f:
         for line in f:
             files.append(line.strip())
 
@@ -54,21 +59,31 @@ async def load_packages(file):
     await asyncio.gather(*tasks)
 
 
-async def unzip_zip():
+def unzip_zip():
     for zip in to_unzip:
         print(f"Unpacking: {zip}")
         with zipfile.ZipFile(zip, 'r') as zipf:
-            zipf.extractall(f'downloads/')
+            zipf.extractall('downloads/')
 
 
-def main(file, *args):
+def main(action, *args):
     start() 
-    if asyncio.run(load('info/', f"{file}.info")) != 1:
-        asyncio.run(load_packages(f"{file}.info"))
-        if to_unzip != []:
-            asyncio.run(unzip_zip())
+    if action == 'install':
+        for file in args:
+            if asyncio.run(load('info/', file, 'info')) != 1:
+                asyncio.run(load_packages(file, "info"))
+                if to_unzip != []:
+                    processes = []
+                    p = Process(target=unzip_zip)
+                    processes.append(p)
+                    p.start()
+                    p.join()
+                    
     print(end())
 
 
-if len(sys.argv) > 1:
-    main(sys.argv[1])
+try:
+    if len(sys.argv) > 2:
+        main(sys.argv[1], *sys.argv[2:])
+except Exception as e:
+    print(f"Program breaked, time: {end()}, error: {e}")
