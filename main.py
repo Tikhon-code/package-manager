@@ -1,6 +1,5 @@
 #!/bin/python
 
-import concurrent.futures
 import datetime
 import asyncio
 import aiohttp
