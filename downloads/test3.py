@@ -34,17 +34,13 @@ class Loader():
                     
 
     async def load_packages_from_file(self, file, type, *args):
-        
-        self.file2 = f"{file}.{type}"
-        self.files = []
-        self.repeat_file = ''
-        with open(f'downloads/{self.file2}', 'r') as f:
-            for line in f:
-                if self.repeat_file == line.strip():
-                    continue
-                self.repeat_file = line.strip()
-                
-                self.files.append(line.strip())
+        threads = []
+        async with aiofiles.open(f"downloads/{file}.{type}") as f:
+            async for line in f:
+                line = line.strip()
+                thread = threading.Thread(target=self.load, args=('packages/', line))
+                thread.start()
+                threads.append(thread)
 
-        self.tasks = [self.load_file('packages/', file) for file in self.files if file.strip() != '']
-        await asyncio.gather(*self.tasks)
+            for thread in threads:
+                thread.join()
